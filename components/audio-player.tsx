@@ -1,71 +1,72 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useRef, useEffect } from "react"
 
 export function AudioPlayer() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(0.5)
   const [currentTrack, setCurrentTrack] = useState(0)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [showAuthModal, setShowAuthModal] = useState(false)
-  const [password, setPassword] = useState("")
-  const [customTracks, setCustomTracks] = useState<Array<{ name: string; src: string; id: string }>>([])
+  const [tracks, setTracks] = useState<Array<{ name: string; src: string; id: string }>>([])
   const [hasValidAudio, setHasValidAudio] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const audioRef = useRef<HTMLAudioElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Секретный пароль для доступа к загрузке музыки
-  const ADMIN_PASSWORD = "jukon2024"
+  const [trackName, setTrackName] = useState("Loading tracks...")
 
-  // Предустановленные треки (только если файлы существуют)
-  const defaultTracks = [
-    {
-      id: "default-1",
-      name: "Demo Track 1",
-      src: "/music/demo1.mp3",
-    },
-    {
-      id: "default-2",
-      name: "Demo Track 2",
-      src: "/music/demo2.mp3",
-    },
-  ]
-
-  // Объединяем предустановленные и пользовательские треки
-  const allTracks = [...defaultTracks, ...customTracks]
-
-  const [trackName, setTrackName] = useState("No audio loaded")
-
-  // Загружаем сохраненные треки из localStorage при инициализации
+  // Загружаем треки из GitHub репозитория
   useEffect(() => {
-    const savedTracks = localStorage.getItem("jukon-custom-tracks")
-    const savedAuth = localStorage.getItem("jukon-admin-session")
-
-    if (savedTracks) {
+    const loadTracksFromGitHub = async () => {
+      setIsLoading(true)
       try {
-        const parsedTracks = JSON.parse(savedTracks)
-        setCustomTracks(parsedTracks)
+        // Получаем список файлов из папки /public/music через GitHub API
+        const response = await fetch("https://api.github.com/repos/Riizzahub/JukonSite/contents/public/music", {
+          headers: {
+            Accept: "application/vnd.github.v3+json",
+          },
+        })
+
+        if (response.ok) {
+          const files = await response.json()
+          const audioFiles = files.filter(
+            (file: any) =>
+              file.name.endsWith(".mp3") ||
+              file.name.endsWith(".wav") ||
+              file.name.endsWith(".ogg") ||
+              file.name.endsWith(".m4a"),
+          )
+
+          const trackList = audioFiles.map((file: any, index: number) => ({
+            id: `github-${index}`,
+            name: file.name.replace(/\.[^/.]+$/, ""), // Убираем расширение
+            src: `/music/${file.name}`, // Путь к файлу в public
+          }))
+
+          setTracks(trackList)
+
+          if (trackList.length > 0) {
+            setTrackName(trackList[0].name)
+          } else {
+            setTrackName("No tracks found")
+          }
+        } else {
+          // Если нет доступа к GitHub API, просто показываем пустой плеер
+          setTracks([])
+          setTrackName("No tracks available")
+        }
       } catch (error) {
-        console.error("Error loading saved tracks:", error)
+        console.error("Failed to load tracks from GitHub:", error)
+        setTracks([])
+        setTrackName("No tracks available")
+      } finally {
+        setIsLoading(false)
       }
     }
 
-    // Проверяем сессию администратора (действует 24 часа)
-    if (savedAuth) {
-      const authData = JSON.parse(savedAuth)
-      const now = Date.now()
-      if (now - authData.timestamp < 24 * 60 * 60 * 1000) {
-        setIsAuthenticated(true)
-      } else {
-        localStorage.removeItem("jukon-admin-session")
-      }
-    }
+    loadTracksFromGitHub()
   }, [])
 
   // Проверяем доступность аудио файла
@@ -78,16 +79,11 @@ export function AudioPlayer() {
     })
   }
 
-  // Сохраняем пользовательские треки в localStorage
-  const saveCustomTracks = (tracks: Array<{ name: string; src: string; id: string }>) => {
-    localStorage.setItem("jukon-custom-tracks", JSON.stringify(tracks))
-  }
-
   // Устанавливаем текущий трек
   const setCurrentAudioTrack = async (trackIndex: number) => {
-    if (!audioRef.current || !allTracks[trackIndex]) return
+    if (!audioRef.current || !tracks[trackIndex]) return
 
-    const track = allTracks[trackIndex]
+    const track = tracks[trackIndex]
     audioRef.current.src = track.src
     setTrackName(track.name)
 
@@ -107,139 +103,22 @@ export function AudioPlayer() {
   }, [volume])
 
   useEffect(() => {
-    setCurrentAudioTrack(currentTrack)
-  }, [currentTrack, customTracks])
-
-  const handleAuth = () => {
-    if (password === ADMIN_PASSWORD) {
-      setIsAuthenticated(true)
-      setShowAuthModal(false)
-      setPassword("")
-
-      // Сохраняем сессию администратора
-      localStorage.setItem(
-        "jukon-admin-session",
-        JSON.stringify({
-          timestamp: Date.now(),
-          authenticated: true,
-        }),
-      )
-
-      // Открываем диалог загрузки файла
-      setTimeout(() => {
-        fileInputRef.current?.click()
-      }, 100)
-    } else {
-      alert("Неверный пароль! Доступ запрещен.")
-      setPassword("")
+    if (tracks.length > 0) {
+      setCurrentAudioTrack(currentTrack)
     }
-  }
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!isAuthenticated) {
-      alert("Доступ запрещен! Только администратор может загружать музыку.")
-      return
-    }
-
-    const file = event.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-
-      reader.onload = (e) => {
-        const arrayBuffer = e.target?.result as ArrayBuffer
-        const blob = new Blob([arrayBuffer], { type: file.type })
-        const url = URL.createObjectURL(blob)
-        const fileName = file.name.replace(/\.[^/.]+$/, "")
-        const trackId = `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
-        const newTrack = {
-          id: trackId,
-          name: fileName,
-          src: url,
-        }
-
-        // Добавляем трек в список пользовательских треков
-        const updatedCustomTracks = [...customTracks, newTrack]
-        setCustomTracks(updatedCustomTracks)
-        saveCustomTracks(updatedCustomTracks)
-
-        // Переключаемся на новый трек
-        const newTrackIndex = allTracks.length // Индекс нового трека будет равен текущей длине массива
-        setCurrentTrack(newTrackIndex)
-        setIsPlaying(false)
-
-        // Автоматически начинаем воспроизведение нового загруженного трека
-        setTimeout(async () => {
-          if (audioRef.current && hasValidAudio) {
-            try {
-              await audioRef.current.play()
-              setIsPlaying(true)
-            } catch (error) {
-              console.error("Auto-play failed:", error)
-              setIsPlaying(false)
-            }
-          }
-        }, 500)
-
-        console.log("Администратор добавил постоянный трек:", fileName)
-        alert(`Трек "${fileName}" успешно добавлен в систему!`)
-      }
-
-      reader.onerror = () => {
-        alert("Ошибка при загрузке файла!")
-      }
-
-      reader.readAsArrayBuffer(file)
-    }
-
-    // Очищаем input для возможности загрузки того же файла снова
-    event.target.value = ""
-  }
-
-  const removeTrack = (trackId: string) => {
-    if (!isAuthenticated) {
-      alert("Доступ запрещен!")
-      return
-    }
-
-    // Нельзя удалять предустановленные треки
-    if (trackId.startsWith("default-")) {
-      alert("Нельзя удалить предустановленный трек!")
-      return
-    }
-
-    const updatedCustomTracks = customTracks.filter((track) => track.id !== trackId)
-    setCustomTracks(updatedCustomTracks)
-    saveCustomTracks(updatedCustomTracks)
-
-    // Если удаляем текущий трек, переключаемся на первый доступный
-    const trackIndex = allTracks.findIndex((track) => track.id === trackId)
-    if (trackIndex === currentTrack) {
-      setCurrentTrack(0)
-      setIsPlaying(false)
-    } else if (trackIndex < currentTrack) {
-      setCurrentTrack(currentTrack - 1)
-    }
-
-    alert("Трек удален из системы!")
-  }
+  }, [currentTrack, tracks])
 
   const togglePlay = async () => {
     if (!audioRef.current) return
 
     // Если нет треков или текущий трек недоступен
-    if (allTracks.length === 0) {
-      if (!isAuthenticated) {
-        setShowAuthModal(true)
-        return
-      } else {
-        fileInputRef.current?.click()
-        return
-      }
+    if (tracks.length === 0) {
+      alert("No tracks available. Please add music files to the GitHub repository in /public/music folder.")
+      return
     }
 
     if (!hasValidAudio) {
-      alert("Текущий трек недоступен. Попробуйте другой трек или загрузите новый.")
+      alert("Current track is unavailable. Please check if the music file exists in the repository.")
       return
     }
 
@@ -273,23 +152,23 @@ export function AudioPlayer() {
       setHasValidAudio(false)
 
       // Пробуем следующий доступный трек
-      if (allTracks.length > 1) {
+      if (tracks.length > 1) {
         nextTrack()
       } else {
-        alert("Не удалось воспроизвести аудио. Пожалуйста, загрузите корректный аудио файл.")
+        alert("Failed to play audio. Please check if the music files exist in the repository.")
       }
     }
   }
 
   const nextTrack = async () => {
-    if (allTracks.length === 0) return
+    if (tracks.length === 0) return
 
-    let nextIndex = (currentTrack + 1) % allTracks.length
+    let nextIndex = (currentTrack + 1) % tracks.length
     let attempts = 0
 
     // Ищем следующий доступный трек
-    while (attempts < allTracks.length) {
-      const isAvailable = await checkAudioAvailability(allTracks[nextIndex].src)
+    while (attempts < tracks.length) {
+      const isAvailable = await checkAudioAvailability(tracks[nextIndex].src)
       if (isAvailable) {
         // Останавливаем текущее воспроизведение
         if (audioRef.current) {
@@ -314,22 +193,22 @@ export function AudioPlayer() {
         }, 300)
         return
       }
-      nextIndex = (nextIndex + 1) % allTracks.length
+      nextIndex = (nextIndex + 1) % tracks.length
       attempts++
     }
 
-    alert("Нет доступных треков для воспроизведения")
+    alert("No available tracks for playback")
   }
 
   const prevTrack = async () => {
-    if (allTracks.length === 0) return
+    if (tracks.length === 0) return
 
-    let prevIndex = (currentTrack - 1 + allTracks.length) % allTracks.length
+    let prevIndex = (currentTrack - 1 + tracks.length) % tracks.length
     let attempts = 0
 
     // Ищем предыдущий доступный трек
-    while (attempts < allTracks.length) {
-      const isAvailable = await checkAudioAvailability(allTracks[prevIndex].src)
+    while (attempts < tracks.length) {
+      const isAvailable = await checkAudioAvailability(tracks[prevIndex].src)
       if (isAvailable) {
         // Останавливаем текущее воспроизведение
         if (audioRef.current) {
@@ -354,25 +233,59 @@ export function AudioPlayer() {
         }, 300)
         return
       }
-      prevIndex = (prevIndex - 1 + allTracks.length) % allTracks.length
+      prevIndex = (prevIndex - 1 + tracks.length) % tracks.length
       attempts++
     }
 
-    alert("Нет доступных треков для воспроизведения")
+    alert("No available tracks for playback")
   }
 
-  const handleUploadClick = () => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true)
-    } else {
-      fileInputRef.current?.click()
+  const refreshTracks = async () => {
+    setIsLoading(true)
+    setTrackName("Refreshing tracks...")
+
+    // Перезагружаем треки из GitHub
+    try {
+      const response = await fetch("https://api.github.com/repos/Riizzahub/JukonSite/contents/public/music", {
+        headers: {
+          Accept: "application/vnd.github.v3+json",
+        },
+      })
+
+      if (response.ok) {
+        const files = await response.json()
+        const audioFiles = files.filter(
+          (file: any) =>
+            file.name.endsWith(".mp3") ||
+            file.name.endsWith(".wav") ||
+            file.name.endsWith(".ogg") ||
+            file.name.endsWith(".m4a"),
+        )
+
+        const trackList = audioFiles.map((file: any, index: number) => ({
+          id: `github-${index}`,
+          name: file.name.replace(/\.[^/.]+$/, ""),
+          src: `/music/${file.name}`,
+        }))
+
+        setTracks(trackList)
+        setCurrentTrack(0)
+        setIsPlaying(false)
+
+        if (trackList.length > 0) {
+          setTrackName(trackList[0].name)
+        } else {
+          setTrackName("No tracks found")
+        }
+
+        alert(`Refreshed! Found ${trackList.length} tracks in the repository.`)
+      }
+    } catch (error) {
+      console.error("Failed to refresh tracks:", error)
+      alert("Failed to refresh tracks from GitHub.")
+    } finally {
+      setIsLoading(false)
     }
-  }
-
-  const logout = () => {
-    setIsAuthenticated(false)
-    localStorage.removeItem("jukon-admin-session")
-    alert("Вы вышли из режима администратора")
   }
 
   const startVisualization = () => {
@@ -456,18 +369,21 @@ export function AudioPlayer() {
   }, [isPlaying, hasValidAudio])
 
   const getStatusText = () => {
-    if (allTracks.length === 0) {
-      return "No tracks • Click to upload"
+    if (isLoading) {
+      return "Loading tracks from GitHub..."
+    }
+    if (tracks.length === 0) {
+      return "No tracks • Add to GitHub repo"
     }
     if (!hasValidAudio) {
-      return "Track unavailable • Upload new"
+      return "Track unavailable • Check repo"
     }
     return isPlaying ? "Playing" : "Ready"
   }
 
   // Автоматическое воспроизведение при смене трека
   useEffect(() => {
-    if (hasValidAudio && audioRef.current && currentTrack >= 0) {
+    if (hasValidAudio && audioRef.current && currentTrack >= 0 && !isLoading) {
       const playNewTrack = async () => {
         try {
           // Небольшая задержка для загрузки нового трека
@@ -488,45 +404,11 @@ export function AudioPlayer() {
 
       return () => clearTimeout(timeoutId)
     }
-  }, [currentTrack, hasValidAudio])
+  }, [currentTrack, hasValidAudio, isLoading])
 
   return (
     <div className="audio-player">
       <audio ref={audioRef} loop preload="none" />
-
-      {/* Auth Modal */}
-      {showAuthModal && (
-        <div className="auth-modal-overlay">
-          <div className="auth-modal">
-            <h3>Доступ ограничен</h3>
-            <p>Только администратор может загружать музыку</p>
-            <div className="auth-form">
-              <input
-                type="password"
-                placeholder="Введите пароль"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleAuth()}
-                className="password-input"
-              />
-              <div className="auth-buttons">
-                <button onClick={handleAuth} className="auth-btn confirm">
-                  Войти
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAuthModal(false)
-                    setPassword("")
-                  }}
-                  className="auth-btn cancel"
-                >
-                  Отмена
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="player-container">
         <canvas ref={canvasRef} width={80} height={50} className="visualizer" />
@@ -534,8 +416,8 @@ export function AudioPlayer() {
         <div className="track-info">
           <div className="track-name">{trackName}</div>
           <div className="track-status">
-            {getStatusText()} • {allTracks.length} треков
-            {isAuthenticated && <span className="admin-badge">ADMIN</span>}
+            {getStatusText()} • {tracks.length} треков
+            <span className="github-badge">GITHUB</span>
           </div>
         </div>
 
@@ -544,15 +426,29 @@ export function AudioPlayer() {
             onClick={prevTrack}
             className="control-btn"
             aria-label="Previous track"
-            disabled={allTracks.length <= 1}
+            disabled={tracks.length <= 1 || isLoading}
           >
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
             </svg>
           </button>
 
-          <button onClick={togglePlay} className="play-button" aria-label={isPlaying ? "Pause music" : "Play music"}>
-            {allTracks.length === 0 || !hasValidAudio ? (
+          <button
+            onClick={togglePlay}
+            className="play-button"
+            aria-label={isPlaying ? "Pause music" : "Play music"}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="animate-spin">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            ) : tracks.length === 0 || !hasValidAudio ? (
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
@@ -567,7 +463,12 @@ export function AudioPlayer() {
             )}
           </button>
 
-          <button onClick={nextTrack} className="control-btn" aria-label="Next track" disabled={allTracks.length <= 1}>
+          <button
+            onClick={nextTrack}
+            className="control-btn"
+            aria-label="Next track"
+            disabled={tracks.length <= 1 || isLoading}
+          >
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M16 18h2V6h-2zm-3.5-6L4 6v12z" />
             </svg>
@@ -590,71 +491,35 @@ export function AudioPlayer() {
           />
         </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="audio/*"
-          onChange={handleFileUpload}
-          className="file-input"
-          style={{ display: "none" }}
-        />
-
-        <button onClick={handleUploadClick} className="upload-btn" aria-label="Upload music file (Admin only)">
-          {isAuthenticated ? (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 15v2m-6 0h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
-          )}
+        <button
+          onClick={refreshTracks}
+          className="refresh-btn"
+          aria-label="Refresh tracks from GitHub"
+          disabled={isLoading}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={isLoading ? "animate-spin" : ""}>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
         </button>
-
-        {isAuthenticated && (
-          <button onClick={logout} className="logout-btn" aria-label="Logout from admin mode">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
-          </button>
-        )}
       </div>
 
-      {/* Admin Track Management */}
-      {isAuthenticated && customTracks.length > 0 && (
-        <div className="track-manager">
-          <h4>Управление треками ({customTracks.length})</h4>
-          <div className="track-list">
-            {customTracks.map((track) => (
-              <div key={track.id} className="track-item">
-                <span className="track-item-name">{track.name}</span>
-                <button
-                  onClick={() => removeTrack(track.id)}
-                  className="remove-btn"
-                  aria-label={`Remove ${track.name}`}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
+      {/* GitHub Instructions */}
+      <div className="github-info">
+        <div className="info-header">
+          <svg viewBox="0 0 24 24" fill="currentColor" className="github-icon">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+          </svg>
+          <span>Add Music via GitHub</span>
         </div>
-      )}
+        <div className="info-text">
+          Upload MP3/WAV files to <code>/public/music/</code> folder in the repository
+        </div>
+      </div>
 
       <style jsx>{`
         .audio-player {
@@ -662,104 +527,6 @@ export function AudioPlayer() {
           bottom: 2rem;
           right: 2rem;
           z-index: 1000;
-        }
-
-        .auth-modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.8);
-          backdrop-filter: blur(10px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 2000;
-        }
-
-        .auth-modal {
-          background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(255, 0, 0, 0.1));
-          backdrop-filter: blur(20px);
-          border: 2px solid rgba(138, 43, 226, 0.5);
-          border-radius: 20px;
-          padding: 2rem;
-          max-width: 400px;
-          width: 90%;
-          text-align: center;
-          box-shadow: 0 20px 60px rgba(138, 43, 226, 0.3);
-        }
-
-        .auth-modal h3 {
-          font-family: 'Orbitron', monospace;
-          font-size: 1.5rem;
-          color: #FF00FF;
-          margin-bottom: 1rem;
-          text-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
-        }
-
-        .auth-modal p {
-          color: rgba(255, 255, 255, 0.8);
-          margin-bottom: 1.5rem;
-          font-size: 0.9rem;
-        }
-
-        .auth-form {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .password-input {
-          padding: 1rem;
-          background: rgba(0, 0, 0, 0.5);
-          border: 2px solid rgba(138, 43, 226, 0.3);
-          border-radius: 10px;
-          color: #ffffff;
-          font-size: 1rem;
-          outline: none;
-          transition: all 0.3s ease;
-        }
-
-        .password-input:focus {
-          border-color: #FF00FF;
-          box-shadow: 0 0 20px rgba(255, 0, 255, 0.3);
-        }
-
-        .auth-buttons {
-          display: flex;
-          gap: 1rem;
-        }
-
-        .auth-btn {
-          flex: 1;
-          padding: 1rem;
-          border: none;
-          border-radius: 10px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          font-family: 'Orbitron', monospace;
-        }
-
-        .auth-btn.confirm {
-          background: linear-gradient(45deg, #8A2BE2, #FF0000);
-          color: white;
-        }
-
-        .auth-btn.confirm:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 30px rgba(138, 43, 226, 0.4);
-        }
-
-        .auth-btn.cancel {
-          background: rgba(255, 255, 255, 0.1);
-          color: white;
-          border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .auth-btn.cancel:hover {
-          background: rgba(255, 255, 255, 0.2);
         }
 
         .player-container {
@@ -809,8 +576,8 @@ export function AudioPlayer() {
           gap: 0.5rem;
         }
 
-        .admin-badge {
-          background: linear-gradient(45deg, #FF0000, #FF00FF);
+        .github-badge {
+          background: linear-gradient(45deg, #333, #666);
           color: white;
           padding: 2px 6px;
           border-radius: 4px;
@@ -825,7 +592,7 @@ export function AudioPlayer() {
           gap: 0.5rem;
         }
 
-        .control-btn {
+        .control-btn, .refresh-btn {
           width: 35px;
           height: 35px;
           border: none;
@@ -839,19 +606,27 @@ export function AudioPlayer() {
           transition: all 0.3s ease;
         }
 
-        .control-btn:hover:not(:disabled) {
+        .control-btn:hover:not(:disabled), .refresh-btn:hover:not(:disabled) {
           background: rgba(138, 43, 226, 0.6);
           transform: scale(1.1);
         }
 
-        .control-btn:disabled {
+        .control-btn:disabled, .refresh-btn:disabled {
           opacity: 0.3;
           cursor: not-allowed;
         }
 
-        .control-btn svg {
+        .control-btn svg, .refresh-btn svg {
           width: 16px;
           height: 16px;
+        }
+
+        .refresh-btn {
+          background: rgba(34, 197, 94, 0.3);
+        }
+
+        .refresh-btn:hover:not(:disabled) {
+          background: rgba(34, 197, 94, 0.6);
         }
 
         .play-button {
@@ -869,9 +644,14 @@ export function AudioPlayer() {
           box-shadow: 0 4px 20px rgba(138, 43, 226, 0.4);
         }
 
-        .play-button:hover {
+        .play-button:hover:not(:disabled) {
           transform: scale(1.1);
           box-shadow: 0 6px 30px rgba(138, 43, 226, 0.6);
+        }
+
+        .play-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
         .play-button svg {
@@ -921,102 +701,54 @@ export function AudioPlayer() {
           box-shadow: 0 2px 10px rgba(138, 43, 226, 0.5);
         }
 
-        .upload-btn, .logout-btn {
-          width: 35px;
-          height: 35px;
-          border: none;
-          border-radius: 50%;
-          background: rgba(255, 0, 255, 0.3);
-          color: white;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.3s ease;
-        }
-
-        .upload-btn:hover, .logout-btn:hover {
-          background: rgba(255, 0, 255, 0.6);
-          transform: scale(1.1);
-        }
-
-        .logout-btn {
-          background: rgba(255, 0, 0, 0.3);
-        }
-
-        .logout-btn:hover {
-          background: rgba(255, 0, 0, 0.6);
-        }
-
-        .upload-btn svg, .logout-btn svg {
-          width: 16px;
-          height: 16px;
-        }
-
-        .track-manager {
+        .github-info {
           margin-top: 1rem;
           padding: 1rem;
           background: rgba(0, 0, 0, 0.8);
           backdrop-filter: blur(20px);
-          border: 2px solid rgba(138, 43, 226, 0.3);
+          border: 2px solid rgba(34, 197, 94, 0.3);
           border-radius: 15px;
           max-width: 450px;
         }
 
-        .track-manager h4 {
+        .info-header {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
           font-family: 'Orbitron', monospace;
           font-size: 0.9rem;
-          color: #FF00FF;
+          color: #22C55E;
           margin-bottom: 0.5rem;
-          text-align: center;
+          font-weight: 600;
         }
 
-        .track-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-          max-height: 150px;
-          overflow-y: auto;
+        .github-icon {
+          width: 16px;
+          height: 16px;
         }
 
-        .track-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0.5rem;
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 8px;
-          border: 1px solid rgba(138, 43, 226, 0.2);
-        }
-
-        .track-item-name {
+        .info-text {
           font-size: 0.8rem;
-          color: #ffffff;
-          flex: 1;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          color: rgba(255, 255, 255, 0.7);
+          font-family: 'Exo 2', sans-serif;
         }
 
-        .remove-btn {
-          width: 20px;
-          height: 20px;
-          border: none;
-          border-radius: 50%;
-          background: rgba(255, 0, 0, 0.5);
-          color: white;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 14px;
-          font-weight: bold;
-          transition: all 0.3s ease;
+        .info-text code {
+          background: rgba(34, 197, 94, 0.2);
+          color: #22C55E;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-family: 'Courier New', monospace;
+          font-size: 0.75rem;
         }
 
-        .remove-btn:hover {
-          background: rgba(255, 0, 0, 0.8);
-          transform: scale(1.1);
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
 
         @media (max-width: 768px) {
@@ -1032,13 +764,8 @@ export function AudioPlayer() {
             gap: 0.8rem;
           }
 
-          .track-manager {
+          .github-info {
             max-width: none;
-          }
-
-          .auth-modal {
-            padding: 1.5rem;
-            margin: 1rem;
           }
 
           .track-info {
@@ -1063,12 +790,12 @@ export function AudioPlayer() {
             height: 20px;
           }
 
-          .control-btn, .upload-btn, .logout-btn {
+          .control-btn, .refresh-btn {
             width: 30px;
             height: 30px;
           }
 
-          .control-btn svg, .upload-btn svg, .logout-btn svg {
+          .control-btn svg, .refresh-btn svg {
             width: 14px;
             height: 14px;
           }

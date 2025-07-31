@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { AudioPlayer } from "@/components/audio-player"
@@ -18,48 +20,48 @@ export default function CreativeLanding() {
       title: "Immortal",
       url: "https://roblox.tg/dashboard/?code=NDQ2Mzc3MzE1MTQ4MDc5NTM2Mg==",
       animation: "wave-deform",
-      gradient: "radial-gradient(circle, #4b0082 0%, #8b0000 100%)",
-      buttonColor: "black",
+      gradient: "linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)",
+      glowColor: "#3b82f6",
     },
     {
       id: 2,
       title: "Splunk",
       url: "https://app.beaming.pro/u/SpIank",
       animation: "wave-deform",
-      gradient: "radial-gradient(circle, #8A2BE2 0%, #FF0000 100%)",
-      buttonColor: "blue",
+      gradient: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+      glowColor: "#10b981",
     },
     {
       id: 3,
       title: "Injuries",
       url: "https://www.logged.tg/auth/jukon",
       animation: "wave-deform",
-      gradient: "radial-gradient(circle, #9400D3 0%, #FF00FF 100%)",
-      buttonColor: "green",
+      gradient: "linear-gradient(135deg, #2d1b69 0%, #1e1b4b 50%, #312e81 100%)",
+      glowColor: "#8b5cf6",
     },
     {
       id: 4,
-      title: "Nexus",
+      title: "Soon",
       url: "#",
       animation: "wave-deform",
-      gradient: "radial-gradient(circle, #4b0082 0%, #9400D3 100%)",
-      buttonColor: "default",
+      gradient: "linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 50%, #3a3a3a 100%)",
+      glowColor: "#6b7280",
     },
     {
       id: 5,
-      title: "Vortex",
+      title: "Soon",
       url: "#",
       animation: "wave-deform",
-      gradient: "radial-gradient(circle, #8b0000 0%, #FF0000 100%)",
-      buttonColor: "default",
+      gradient: "linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 50%, #3a3a3a 100%)",
+      glowColor: "#6b7280",
     },
     {
       id: 6,
-      title: "Aurora",
+      title: "Soon",
       url: "#",
       animation: "wave-deform",
-      gradient: "radial-gradient(circle, #FF00FF 0%, #8A2BE2 100%)",
-      buttonColor: "default",
+      gradient: "linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 50%, #3a3a3a 100%)",
+      glowColor: "#6b7280",
     },
   ]
 
@@ -83,20 +85,40 @@ export default function CreativeLanding() {
         <div className="blocks-grid">
           {blocks.map((block) => (
             <div key={block.id} className={`block ${block.animation}`} data-block={block.id}>
-              <div className="block-inner" style={{ background: block.gradient }}>
+              <div
+                className="block-inner"
+                style={
+                  {
+                    background: block.gradient,
+                    "--glow-color": block.glowColor,
+                  } as React.CSSProperties
+                }
+              >
                 <div className="block-content">
                   <h2 className="block-title">{block.title}</h2>
-                  <Link
-                    href={block.url}
-                    className={`dashboard-btn dashboard-btn-${block.buttonColor}`}
-                    target={block.url.startsWith("http") ? "_blank" : "_self"}
-                    rel={block.url.startsWith("http") ? "noopener noreferrer" : ""}
-                  >
-                    <span>Dashboard</span>
-                    <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5-5 5M6 12h12" />
-                    </svg>
-                  </Link>
+                  {block.title === "Soon" ? (
+                    <div className="coming-soon-btn">
+                      <span className="btn-text">Coming Soon</span>
+                      <div className="btn-glow"></div>
+                      <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12,6 12,12 16,14" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <Link
+                      href={block.url}
+                      className="dashboard-btn"
+                      target={block.url.startsWith("http") ? "_blank" : "_self"}
+                      rel={block.url.startsWith("http") ? "noopener noreferrer" : ""}
+                    >
+                      <span className="btn-text">Dashboard</span>
+                      <div className="btn-glow"></div>
+                      <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5-5 5M6 12h12" />
+                      </svg>
+                    </Link>
+                  )}
                 </div>
                 <div className="block-overlay"></div>
               </div>
@@ -236,8 +258,11 @@ export default function CreativeLanding() {
           position: relative;
           overflow: hidden;
           backdrop-filter: blur(10px);
-          border: 2px solid rgba(138, 43, 226, 0.3);
+          border: 2px solid rgba(255, 255, 255, 0.1);
           transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 
+            0 8px 32px rgba(0, 0, 0, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         .block-content {
@@ -258,86 +283,82 @@ export default function CreativeLanding() {
           text-transform: uppercase;
           letter-spacing: 0.1em;
           text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+          color: #ffffff;
         }
 
-        .dashboard-btn {
+        .dashboard-btn, .coming-soon-btn {
+          position: relative;
           display: inline-flex;
           align-items: center;
-          gap: 0.5rem;
-          padding: 1rem 2rem;
-          background: rgba(255, 255, 255, 0.1);
-          border: 2px solid rgba(255, 255, 255, 0.3);
+          gap: 0.8rem;
+          padding: 1.2rem 2.5rem;
+          background: rgba(0, 0, 0, 0.8);
+          border: 2px solid rgba(255, 255, 255, 0.9);
           border-radius: 50px;
           color: #ffffff;
           text-decoration: none;
-          font-weight: 600;
+          font-weight: 700;
           font-size: 1rem;
           text-transform: uppercase;
           letter-spacing: 0.1em;
-          transition: all 0.3s ease;
-          backdrop-filter: blur(10px);
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+          backdrop-filter: blur(20px);
+          box-shadow: 
+            0 8px 32px rgba(0, 0, 0, 0.5),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2);
           align-self: flex-start;
+          overflow: hidden;
+          font-family: 'Orbitron', monospace;
         }
 
-        /* Dashboard Button Color Variants */
-        .dashboard-btn-black {
-          background: #000000 !important;
-          color: #FFFFFF !important;
-          border: 2px solid #FFFFFF !important;
-          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5) !important;
+        .coming-soon-btn {
+          cursor: default;
+          opacity: 0.7;
+          border-color: rgba(107, 114, 128, 0.5);
         }
 
-        .dashboard-btn-black:hover {
-          background: #1A1A1A !important;
-          color: #FFFFFF !important;
-          border: 2px solid #F0F0F0 !important;
-          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7) !important;
+        .btn-text {
+          position: relative;
+          z-index: 2;
         }
 
-        .dashboard-btn-blue {
-          background: #00BFFF !important;
-          color: #FFFFFF !important;
-          border: 2px solid #00BFFF !important;
-          box-shadow: 0 6px 20px rgba(0, 191, 255, 0.4) !important;
+        .btn-glow {
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+          transition: left 0.6s ease;
+          z-index: 1;
         }
 
-        .dashboard-btn-blue:hover {
-          background: #1E90FF !important;
-          color: #FFFFFF !important;
-          border: 2px solid #1E90FF !important;
-          box-shadow: 0 8px 30px rgba(30, 144, 255, 0.6) !important;
+        .dashboard-btn:hover .btn-glow {
+          left: 100%;
         }
 
-        .dashboard-btn-green {
-          background: #00FF7F !important;
-          color: #000000 !important;
-          border: 2px solid #00FF7F !important;
-          box-shadow: 0 6px 20px rgba(0, 255, 127, 0.4) !important;
-        }
-
-        .dashboard-btn-green:hover {
-          background: #32CD32 !important;
-          color: #000000 !important;
-          border: 2px solid #32CD32 !important;
-          box-shadow: 0 8px 30px rgba(50, 205, 50, 0.6) !important;
-        }
-
-        .dashboard-btn-default:hover {
-          background: rgba(255, 255, 255, 0.2);
-          border-color: rgba(255, 255, 255, 0.6);
-          transform: translateY(-2px);
-          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        .dashboard-btn:hover {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: var(--glow-color, #ffffff);
+          color: #ffffff;
+          transform: translateY(-4px) scale(1.05);
+          box-shadow: 
+            0 15px 50px rgba(0, 0, 0, 0.6),
+            0 0 30px var(--glow-color, rgba(255, 255, 255, 0.5)),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3);
+          text-shadow: 0 0 20px var(--glow-color, rgba(255, 255, 255, 0.8));
         }
 
         .btn-icon {
           width: 20px;
           height: 20px;
           transition: transform 0.3s ease;
+          position: relative;
+          z-index: 2;
         }
 
         .dashboard-btn:hover .btn-icon {
-          transform: translateX(4px);
+          transform: translateX(6px) rotate(45deg);
         }
 
         .block-overlay {
@@ -354,11 +375,11 @@ export default function CreativeLanding() {
         /* Wave Deform Animation */
         .wave-deform:hover .block-inner {
           animation: wave-deform 0.6s ease-in-out;
-          border-color: #FF00FF;
+          border-color: var(--glow-color, #ffffff);
           box-shadow: 
-            0 0 50px rgba(255, 0, 255, 0.5),
-            0 0 100px rgba(138, 43, 226, 0.3),
-            inset 0 0 50px rgba(255, 0, 255, 0.1);
+            0 0 50px var(--glow-color, rgba(255, 255, 255, 0.3)),
+            0 0 100px var(--glow-color, rgba(255, 255, 255, 0.2)),
+            inset 0 0 50px var(--glow-color, rgba(255, 255, 255, 0.05));
           transform: scale(1.02);
         }
 
@@ -382,11 +403,12 @@ export default function CreativeLanding() {
         }
 
         .wave-deform:hover .block-overlay {
-          background: rgba(255, 0, 255, 0.1);
+          background: var(--glow-color, rgba(255, 255, 255, 0.1));
+          opacity: 0.1;
         }
 
         .wave-deform:hover .block-title {
-          text-shadow: 0 0 30px #FF00FF, 0 0 60px #FF00FF;
+          text-shadow: 0 0 30px var(--glow-color, #ffffff), 0 0 60px var(--glow-color, #ffffff);
           animation: text-wave 0.6s ease-in-out;
         }
 
@@ -424,6 +446,12 @@ export default function CreativeLanding() {
             padding: 2rem 0;
             margin-bottom: 2rem;
           }
+
+          .dashboard-btn, .coming-soon-btn {
+            padding: 1rem 2rem;
+            font-size: 0.9rem;
+            gap: 0.6rem;
+          }
         }
 
         @media (max-width: 480px) {
@@ -435,9 +463,9 @@ export default function CreativeLanding() {
             padding: 1rem;
           }
 
-          .dashboard-btn {
+          .dashboard-btn, .coming-soon-btn {
             padding: 0.8rem 1.5rem;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
           }
         }
 
