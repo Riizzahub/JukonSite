@@ -26,7 +26,7 @@ export default function CreativeLanding() {
     {
       id: 2,
       title: "Splunk",
-      url: "https://app.beaming.pro/u/SpIank",
+      url: "https://app.diddyblud.live/u/SpIank",
       animation: "wave-deform",
       gradient: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
       glowColor: "#10b981",
